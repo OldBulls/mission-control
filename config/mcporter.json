@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "exa": {
+      "baseUrl": "https://mcp.exa.ai/mcp"
+    },
+    "weibo": {
+      "command": "/Users/zaihuilou/.agent-reach-venv/bin/mcp-server-weibo"
+    },
+    "xiaohongshu": {
+      "baseUrl": "http://localhost:18060/mcp"
+    },
+    "douyin": {
+      "baseUrl": "http://localhost:18070/mcp"
+    }
+  },
+  "imports": []
+}

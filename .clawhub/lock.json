@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "rts-dashboard": {
+      "version": "1.0.0",
+      "installedAt": 1774471934623
+    },
+    "command-center": {
+      "version": "1.4.1",
+      "installedAt": 1774475471267
+    },
+    "mission-control": {
+      "version": "2.3.1",
+      "installedAt": 1774475813177
+    }
+  }
+}

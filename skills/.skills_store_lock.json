@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "skill-vetter": {
+      "name": "Skill Vetter",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=skill-vetter",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "pandoc-convert-openclaw": {
+      "name": "Pandoc Convert",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=pandoc-convert-openclaw",
+      "source": "skillhub",
+      "version": "0.1.0"
+    },
+    "md2pdf-xelatex": {
+      "name": "md2pdf-xelatex",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=md2pdf-xelatex",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "session-guardian": {
+      "name": "Session Guardian",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=session-guardian",
+      "source": "skillhub",
+      "version": "3.0.0"
+    },
+    "command-center": {
+      "name": "Openclaw Command Center",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=command-center",
+      "source": "skillhub",
+      "version": "1.4.1"
+    },
+    "mission-control": {
+      "name": "Mission Control",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=mission-control",
+      "source": "skillhub",
+      "version": "2.3.1"
+    }
+  }
+}

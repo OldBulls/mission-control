@@ -1,0 +1,52 @@
+{
+  "plugins": {
+    "entries": {
+      "memory-lancedb-pro": {
+        "enabled": true,
+        "package": "@cortexreach/memory-lancedb-pro",
+        "config": {
+          "embedding": {
+            "apiKey": "jina_6fb7060afaa4478e9aa30bfa8ffecc69hjpRRUSqCf-Qg6hgDDwRjA4jlf4T",
+            "model": "jina-embeddings-v5-text-small",
+            "baseURL": "https://api.jina.ai/v1",
+            "dimensions": 1024,
+            "taskQuery": "retrieval.query",
+            "taskPassage": "retrieval.passage",
+            "normalized": true
+          },
+          "autoCapture": true,
+          "autoRecall": true,
+          "captureAssistant": false,
+          "smartExtraction": true,
+          "extractMinMessages": 2,
+          "extractMaxChars": 8000,
+          "llm": {
+            "apiKey": "cr_fdae8c193fcf9c2cdb407ed3c599cdfa0559dc722ca18f8b18749be29a3edcaa",
+            "model": "gemini-2.0-flash-exp",
+            "baseURL": "https://generativelanguage.googleapis.com/v1beta/openai"
+          },
+          "retrieval": {
+            "mode": "hybrid",
+            "vectorWeight": 0.7,
+            "bm25Weight": 0.3,
+            "rerank": "cross-encoder",
+            "rerankProvider": "jina",
+            "rerankModel": "jina-reranker-v3",
+            "rerankEndpoint": "https://api.jina.ai/v1/rerank",
+            "rerankApiKey": "jina_6fb7060afaa4478e9aa30bfa8ffecc69hjpRRUSqCf-Qg6hgDDwRjA4jlf4T",
+            "candidatePoolSize": 12,
+            "minScore": 0.6,
+            "hardMinScore": 0.65,
+            "filterNoise": true
+          },
+          "sessionMemory": {
+            "enabled": false
+          }
+        }
+      }
+    },
+    "slots": {
+      "memory": "memory-lancedb-pro"
+    }
+  }
+}

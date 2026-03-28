@@ -1,0 +1,61 @@
+# TOOLS.md - Local Notes
+
+Skills define _how_ tools work. This file is for _your_ specifics — the stuff that's unique to your setup.
+
+## What Goes Here
+
+Things like:
+
+- Camera names and locations
+- SSH hosts and aliases
+- Preferred voices for TTS
+- Speaker/room names
+- Device nicknames
+- Anything environment-specific
+
+## Examples
+
+```markdown
+### Cameras
+
+- living-room → Main area, 180° wide angle
+- front-door → Entrance, motion-triggered
+
+### SSH
+
+- home-server → 192.168.1.100, user: admin
+
+### TTS
+
+- Preferred voice: "Nova" (warm, slightly British)
+- Default speaker: Kitchen HomePod
+```
+
+## Why Separate?
+
+Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
+
+---
+
+Add whatever helps you do your job. This is your cheat sheet.
+
+## 搜索技能配置
+
+### 优先级顺序（智能路由）
+
+**默认**: tavily-search-pro（深度研究，高质量）
+**特殊场景**:
+- 指定引擎（百度/Google/微信）→ multi-search-engine
+- 站内搜索（site:）→ multi-search-engine
+- 文件类型（filetype:）→ multi-search-engine
+- 隐私搜索 → multi-search-engine
+- 知识查询/计算 → multi-search-engine (WolframAlpha)
+- 快速简单查询 → openclaw-tavily-search
+
+**详细策略**: 参考 `memory/search-strategy.md`
+
+### 当前可用
+1. ✅ tavily-search-pro - 深度研究（5种模式）
+2. ✅ multi-search-engine - 17个引擎（零配置）
+3. ✅ openclaw-tavily-search - 快速搜索
+4. ❌ twitter-search - 需要配置 AISA_API_KEY
