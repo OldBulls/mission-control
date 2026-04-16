@@ -352,20 +352,56 @@ cat ~/.openclaw/data/graphify/openclaw-memory/.graphifyignore
 
 ## 记忆周审按钮 SOP（2026-04-16 确立）
 
-周日 10:30 飞书「🧠 记忆周审提醒」卡片的按钮点击会以合成消息形式进入主会话，格式：`用户点击了按钮: taskId=memory-weekly-<date> action=<action>`。收到后按下列 SOP 处理：
+周日 10:30 飞书「🧠 记忆周审提醒」卡片（schema 2.0 form）的按钮/表单提交会以合成消息形式进入主会话。两种格式：
+
+**A. 纯按钮点击**：`用户点击了按钮: taskId=memory-weekly-<date> action=<action>`
+**B. 表单提交**：`用户点击了按钮: taskId=memory-weekly-<date> action=<action> form: [green=h1,h2; yellow=; high=h3,h4; review=h5; low=]`（五档：green/yellow/high/review/low，空字段表示该档全未选）
 
 | action | 动作 | 命令 |
 |---|---|---|
-| `memory-merge-green` | 合并 🟢 子 agent 上卷改写版 | `python3 ~/.openclaw/scripts/memory-merge-weekly.py --tier green --json` |
-| `memory-merge-high` | 合并 🔥 高优先候选 | `python3 ~/.openclaw/scripts/memory-merge-weekly.py --tier high --json` |
+| `memory-merge-selected` | 合并表单勾选的条目（**主流程**） | 从 form 解析 `green=...;high=...` hash 列表（逗号分隔），合并后传入 `--include-hashes h1,h2,...`：`python3 ~/.openclaw/scripts/memory-merge-weekly.py --tier all --include-hashes <merged> --json` |
 | `memory-rollback` | 回滚最近一次周合并 | `python3 ~/.openclaw/scripts/memory-merge-weekly.py --rollback --json` |
 | `cancel` | 跳过本周 | 回复「好的，本周跳过记忆合并」即可，不调脚本 |
+| `setup-git-choose` | 用户点「💡 启用 Git 后可回滚」要选平台 | 发二级卡片：`python3 ~/.openclaw/scripts/sunday-memory-digest.py --mode=git-setup`（卡片里有 GitHub/Gitee/Gitcode 三按钮，带 ✓ 标注已装 CLI） |
+| `setup-git-github` / `setup-git-gitee` / `setup-git-gitcode` | 用户在二级卡片选了平台，全自动流程 | ①**引导生成 Token**：给平台对应的创建页链接（github.com/settings/tokens、gitee.com/profile/personal_access_tokens、gitcode.com/profile/access_tokens）+ 最小权限说明（repo 读写即可），让用户粘贴 token；②**存 token**：写到 `~/.openclaw/credentials/git-<platform>.token`（600 权限）；③**拉仓库列表**：用 token 调 API（GitHub: `GET /user/repos`；Gitee: `GET /api/v5/user/repos?access_token=...`；Gitcode: `GET /api/v3/projects?private_token=...`）列出已有仓库，让用户选；若无合适的就提示新建（API 创建 or 引导用户到网页建）；④**配本地 remote**：`cd ~/.openclaw/workspace && git init && git remote add origin <URL>`（URL 用 `https://<token>@<host>/<path>.git` 带 token，或用 ssh key，先跑通再说）；⑤**首推**：`git add -A && git commit -m "initial memory snapshot" && git push -u origin main`；⑥回复「已接好 <Platform>/<repo>，下次合并自动推送」。**CLI 未装**：先引导 `brew install gh`（或 gitee/gitcode 对应方式），装完再接 ①。 |
+| `memory-merge-green` / `memory-merge-high` | 兼容老格式（不带 form），分别合并单 tier 全部 | `--tier green/high --json` |
 
 **执行规范**：
 1. 直接用 Bash 工具调脚本，读 stdout JSON 结果
-2. 脚本内部已自动 `git commit`（pre/post 快照），无需手动处理 git
-3. 回复格式：一句话总结（合并了几条 🟢 / 几条 🔥 / 回滚了哪一天），附提示「如需撤销回复「回滚」即可」
-4. 脚本输出 `status=noop` 时（所有候选已在 MEMORY.md）直接告知，不要重复合并
+2. 解析 form 时：`form: [green=a,b,c; high=d,e]` → 把 `green` 和 `high` 的 hash 全部合并到一个逗号分隔列表传给 `--include-hashes`；若某个 tier 为空（如 `green=`）则跳过
+3. 脚本内部已自动 `git commit`（pre/post 快照），无需手动处理 git；合并成功后还会自动跑 `memory-archive.py`（默认保留近 8 周的 `## 周合并` section 在主 MEMORY.md，更早的移入 `memory/archive/MEMORY-WEEKLY-MERGE-YYYY.md` 按年归档），结果回填 JSON 的 `archive` 字段；若 workspace 已配 remote，最后自动 `git push`，推送结果回填 `push` 字段（`pushed: true/false` + 失败原因）
+4. 回复格式：一句话总结（合并了几条 🟢 / 几条 🔥 / 回滚了哪一天）
+5. 脚本输出 `status=noop` 时（所有候选已在 MEMORY.md）直接告知，不要重复合并
+6. **每次按钮动作执行完后必发后续引导**（一条简短文本，附在总结后）：
+   - merge 后：一句话带上 push 状态（如 `push.pushed=true` → 「已推送远程」；`pushed=false` 且 reason=no remote → 「本地已存，未配远程」；push 失败 → 「本地已存，推送失败：<error>，请手动 `git push`」），再跟「如需再调整：① 回复「回滚」撤销本次合并 · ② 编辑 `workspace/MEMORY.md` 手动增删 · ③ 下周日 10:30 新卡片会再推」
+   - cancel 后：「好的，本周跳过。候选已保留在 `MEMORY-CANDIDATES.md` / `SUBAGENT-UPSTREAM.md`。**想重新合并时直接回复「重发周审卡片」**（或「重新发卡片」/「重发记忆卡片」），我会立刻把候选卡片再推给你」
+   - rollback 后：「已撤销最近一次合并；如需重新合并**回复「重发周审卡片」**（或「重新发卡片」），我会把候选卡片再推给你」
+
+7. **关键字触发**（用户在飞书任意时刻回复以下词，agent 必须**立即**执行对应脚本）：
+   | 用户回复（任一别名） | 执行命令 |
+   |---|---|
+   | 重发周审卡片 / 重新发卡片 / 重发记忆卡片 | `python3 ~/.openclaw/scripts/sunday-memory-digest.py` |
+   | 回滚 / 回滚合并 / 撤销合并 | `python3 ~/.openclaw/scripts/memory-merge-weekly.py --rollback --json` |
+
+   **硬约束**（违反即 bug）：
+   - ❌ **不要**检查「最近是否刚执行过」来决定跳过 — 用户既然又打关键字就是要再执行
+   - ❌ **不要**反问「确定要重发吗？」/「刚发过了，还要再发吗？」
+   - ❌ **不要**回复「卡片已于 N 分钟前发出，请先查看飞书」这类推脱话术
+   - ✅ 收到关键字 → 立即 Bash 调脚本 → 脚本成功后回文字确认（用第 8 条的中文 tier 标签）
+
+8. **Tier 中文称谓（user-facing 文案强制使用，禁止英文 tier 名/错配 emoji）**：所有给用户的回复/总结里，tier 必须与飞书卡片上的 emoji 和标题完全一致：
+
+   | 内部 key | 文案中必须写成 | 来源 |
+   |---|---|---|
+   | `high`  | 🔥 高优先 | MEMORY-CANDIDATES |
+   | `review`| 📋 待审阅 | MEMORY-CANDIDATES |
+   | `low`   | 📦 低优先 | MEMORY-CANDIDATES |
+   | `green` | 🟢 通用型 | SUBAGENT-UPSTREAM |
+   | `yellow`| 🟡 半通用 | SUBAGENT-UPSTREAM |
+   | `red`   | 🔴 专属类 | SUBAGENT-UPSTREAM |
+
+   **禁止**：`🔵 high` / `🟠 review` / `⚪ low` / 裸英文 tier 名（green/yellow 等）。
+   **示例**：重发卡片后的确认文案写「🔥 高优先 6 · 📋 待审阅 5 · 📦 低优先 3 · 🟢 通用型 11 · 🟡 半通用 2 · 🔴 专属类 4」，不要写「high 6、review 5、green 11…」。
 
 ## 上下文磨损与心跳优化
 
