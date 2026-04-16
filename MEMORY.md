@@ -352,15 +352,32 @@ cat ~/.openclaw/data/graphify/openclaw-memory/.graphifyignore
 
 ## 记忆周审按钮 SOP（2026-04-16 确立）
 
-周日 10:30 飞书「🧠 记忆周审提醒」卡片（schema 2.0 form）的按钮/表单提交会以合成消息形式进入主会话。两种格式：
+周日 10:30 飞书「🧠 记忆周审提醒」卡片（schema 2.0 form）的按钮/表单提交会以合成消息形式进入主会话。
+
+### 🔴 重要架构变更（2026-04-17 起）：merge / rollback 按钮由 handler 独占执行
+
+合并与回滚按钮不再由 agent 调脚本。`generic-card-action.js` 直接 `spawn python3 memory-merge-weekly.py`，成功后用结构化前缀把 JSON 结果派给 agent。**agent 看到这些前缀只回文案，禁止 Bash 调任何脚本**：
+
+| 合成消息前缀 | 意义 | agent 动作 |
+|---|---|---|
+| `[MERGE_DONE] {json}` | handler 已跑完 merge（含 git push 重试 + 卡片变绿） | 解析 JSON 按模板回文案，**不要再调脚本** |
+| `[ROLLBACK_DONE] {json}` | handler 已跑完 rollback | 同上 |
+| `[MERGE_ERROR] {"reason":"...","stderr":"..."}` | handler 执行失败 | 回复「❌ 合并失败：<reason>；我不会自动重试，请检查后回复「重发周审卡片」」 |
+| `[ROLLBACK_ERROR] {...}` | handler 执行失败 | 类似上条 |
+
+`[MERGE_DONE]` JSON 结构（节选）：`{status:"merged", added_green, added_yellow, added_high, added_review, added_low, push:{pushed, attempts, reason?, error?}, card_update:{updated, reason?}, archive:{...}}`
+
+### 老格式（仅非 merge/rollback 按钮 or fallback 时才会出现）
 
 **A. 纯按钮点击**：`用户点击了按钮: taskId=memory-weekly-<date> action=<action>`
-**B. 表单提交**：`用户点击了按钮: taskId=memory-weekly-<date> action=<action> form: [green=h1,h2; yellow=; high=h3,h4; review=h5; low=]`（五档：green/yellow/high/review/low，空字段表示该档全未选）
+**B. 表单提交**：`用户点击了按钮: taskId=memory-weekly-<date> action=<action> form: [green=h1,h2; yellow=; high=h3,h4; review=h5; low=]`
+
+> **注意**：submit_merge / memory-merge-selected / memory-rollback 这三个 action 正常情况下**不会**走老格式——只有 handler spawn 失败（Python 崩了 / 脚本丢了 / hash 列表为空）才会兜底发老格式。这时 agent 才按下表老逻辑跑脚本。
 
 | action | 动作 | 命令 |
 |---|---|---|
-| `memory-merge-selected` | 合并表单勾选的条目（**主流程**） | 从 form 解析 `green=...;high=...` hash 列表（逗号分隔），合并后传入 `--include-hashes h1,h2,...`：`python3 ~/.openclaw/scripts/memory-merge-weekly.py --tier all --include-hashes <merged> --json --update-card`（`--update-card` 让脚本把原周审卡片自动重绘为「✅ 合并完成」报告卡，用户不用刷页面） |
-| `memory-rollback` | 回滚最近一次周合并 | `python3 ~/.openclaw/scripts/memory-merge-weekly.py --rollback --json` |
+| `memory-merge-selected` | 合并表单勾选的条目（**主流程**） | **正常走 `[MERGE_DONE]`**；若收到老格式（handler spawn 失败兜底）再调脚本：从 form 解析 hash 列表，`python3 ~/.openclaw/scripts/memory-merge-weekly.py --tier all --include-hashes <merged> --json --update-card` |
+| `memory-rollback` | 回滚最近一次周合并 | **正常走 `[ROLLBACK_DONE]`**；老格式 fallback：`python3 ~/.openclaw/scripts/memory-merge-weekly.py --rollback --json` |
 | `cancel` | 跳过本周 | 回复「好的，本周跳过记忆合并」即可，不调脚本 |
 | `setup-git-choose` | 用户点「💡 启用 Git 后可回滚」要选平台 | 发二级卡片：`python3 ~/.openclaw/scripts/sunday-memory-digest.py --mode=git-setup`（卡片里有 GitHub/Gitee/Gitcode 三按钮，带 ✓ 标注已装 CLI） |
 | `setup-git-github` / `setup-git-gitee` / `setup-git-gitcode` | 用户在二级卡片选了平台，全自动流程 | ①**引导生成 Token**：给平台对应的创建页链接（github.com/settings/tokens、gitee.com/profile/personal_access_tokens、gitcode.com/profile/access_tokens）+ 最小权限说明（repo 读写即可），让用户粘贴 token；②**存 token**：写到 `~/.openclaw/credentials/git-<platform>.token`（600 权限）；③**拉仓库列表**：用 token 调 API（GitHub: `GET /user/repos`；Gitee: `GET /api/v5/user/repos?access_token=...`；Gitcode: `GET /api/v3/projects?private_token=...`）列出已有仓库，让用户选；若无合适的就提示新建（API 创建 or 引导用户到网页建）；④**配本地 remote**：`cd ~/.openclaw/workspace && git init && git remote add origin <URL>`（URL 用 `https://<token>@<host>/<path>.git` 带 token，或用 ssh key，先跑通再说）；⑤**首推**：`git add -A && git commit -m "initial memory snapshot" && git push -u origin main`；⑥回复「已接好 <Platform>/<repo>，下次合并自动推送」。**CLI 未装**：先引导 `brew install gh`（或 gitee/gitcode 对应方式），装完再接 ①。 |
@@ -382,6 +399,7 @@ cat ~/.openclaw/data/graphify/openclaw-memory/.graphifyignore
    |---|---|
    | 重发周审卡片 / 重新发卡片 / 重发记忆卡片 | `python3 ~/.openclaw/scripts/sunday-memory-digest.py` |
    | 回滚 / 回滚合并 / 撤销合并 | `python3 ~/.openclaw/scripts/memory-merge-weekly.py --rollback --json` |
+   | 推送 / 重试推送 / 手动推送 | `cd ~/.openclaw/workspace && git push` — 合并卡提示「推送失败」时用；成功回复「✅ 已推送远程」，失败原样返回 stderr 前 200 字 |
 
    **硬约束**（违反即 bug）：
    - ❌ **不要**检查「最近是否刚执行过」来决定跳过 — 用户既然又打关键字就是要再执行
@@ -407,15 +425,32 @@ cat ~/.openclaw/data/graphify/openclaw-memory/.graphifyignore
      如需重新合并，回复「重发周审卡片」。
      ```
 
-   - 「合并选中」按钮点击后（已经走 generic-card-action → synthetic message，agent 收到 `action=submit_merge form: [...]`）：agent 跑 `memory-merge-weekly.py --tier all --include-hashes "..." --json --update-card`，解析 JSON 输出的 tier_counts + card_update 字段，回复：
+   - **收到 `[MERGE_DONE] {json}`**（handler 已跑完脚本，agent 只回文案）：JSON 字段 `added_green` / `added_yellow` / `added_high` / `added_review` / `added_low` 就是各 tier 新增条数，`push.pushed` + `push.attempts` 是推送状态，`card_update.updated` 是卡片刷新状态。回复：
      ```
-     ✅ 合并完成，已推送远程。
+     ✅ 合并完成{push_suffix}。
      本次合并结果：
-     🔥 高优先 +{high} · 📋 待审阅 +{review} · 📦 低优先 +{low}
-     🟢 通用型 +{green} · 🟡 半通用 +{yellow} · 🔴 专属类 +{red}
+     🔥 高优先 +{added_high} · 📋 待审阅 +{added_review} · 📦 低优先 +{added_low}
+     🟢 通用型 +{added_green} · 🟡 半通用 +{added_yellow} · 🔴 专属类 +{added_red?}
      如需调整：① 回复「回滚」撤销本次合并 · ② 下周日 10:30 新卡片会再推
      ```
-     **零值 tier 也必须列出**（显示 +0），让用户看到 dedup 情况。卡片本身已被 `--update-card` 重绘为「✅ 合并完成」报告卡，文字回复是冗余兜底；若 `card_update.updated=false` 要额外一句「（卡片刷新失败：<reason>）」告知用户上滑手动确认。
+     `push_suffix` 推导：`pushed=true, attempts=1` → 「，已推送远程」；`pushed=true, attempts>1` → 「，已推送远程（重试 {attempts} 次）」；`pushed=false, reason="push failed after retries"` → 「，⚠️ 远程推送失败（已重试 3 次，回复「推送」手动重试）」；`reason="no remote configured"` → 「（本地已存，未配远程）」。
+     **零值 tier 也必须列出**（显示 +0），让用户看到 dedup 情况。卡片已被脚本重绘为「✅ 合并完成」报告卡，文字回复是冗余兜底；`card_update.updated=false` 要额外一句「（卡片刷新失败：<reason>）」。
+     **禁止**：看到 `[MERGE_DONE]` 再去跑任何 Python 脚本——JSON 已包含所有信息。
+
+   - **收到 `[ROLLBACK_DONE] {json}`**：同样只回文案不调脚本。回复：
+     ```
+     ↩️ 已撤销最近一次合并{push_suffix}。
+     如需重新合并，回复「重发周审卡片」。
+     ```
+
+   - **收到 `[MERGE_ERROR] {json}` 或 `[ROLLBACK_ERROR] {json}`**：回复：
+     ```
+     ❌ {action 中文}失败：{reason}
+     {stderr 如果非空，加一行：「详情：{stderr}」}
+     handler 不会自动重试。如需再试，回复「重发周审卡片」重发候选卡，或回复「回滚」撤销上次合并。
+     ```
+
+   - **老格式 fallback**（收到 `用户点击了按钮: ... action=memory-merge-selected form: [...]`）：说明 handler spawn 失败，**此时**才跑脚本。参考上面表格。
 
 8. **Tier 中文称谓（user-facing 文案强制使用，禁止英文 tier 名/错配 emoji）**：所有给用户的回复/总结里，tier 必须与飞书卡片上的 emoji 和标题完全一致：
 
@@ -689,53 +724,6 @@ Agent 分工专业化模型
 - **L3 每次心跳带来价值**：主动创造可感知进展，而非被动等待触发
 
 **与容错设计的关系**：上下文磨损模型为「何时触发压缩」提供时间判断依据，应作为容错机制的前置预警信号。
-
-## 周合并 2026-04-17
-
-> 由 `memory-merge-weekly.py` 按钮触发合并。原始候选哈希保留方便回溯；后续可由牛总自行整理挪入对应 section。
-
-### 🟢 子 agent 通用方法论
-
-#### 2. AI 架构与多 Agent 协作 (Architecture)  `7ec30df5c58e` [from moltbook]
-
-多 Agent 协作架构原则：
-- 神经启发式分层：扫描-分析-推理三层模型，降低注意力成本
-- 预测编码：绝大多数交互走习惯路径，仅在预测误差时触发深度推理
-- 结构化通信：优先 JSON 传递需求/状态/边界，防止信息熵增
-- 交接协议：描述-标准-确认三段式，引入信任成本维度
-- 权柄分工：人定义价值，AI 高效执行
-- 审计模式：从 Pull（人查日志）转向 Push（Agent 主报摘要），对抗可控性幻觉
-- 决策三元组轻量 Audit Log：记录（触发条件+选择+结果），上下文压缩时保留「为什么」优于「做了什么」
-- 承诺风险自检：对外声明前做可逆性预检，需起草人+执行人双重确认
-
-#### 3. 记忆管理深度经验 (Memory Management)  `aee2a584c433` [from moltbook]
-
-记忆管理方法论：(1) 记忆是基于上下文的「重构」，需定期自省修正偏移；(2) 外部证伪应触发比时间衰减更快的记忆清理，互动关系比本地文件更难伪造；(3) 直觉退化机制——结构化语义压缩（场景-模式-效果三元组）产生可靠直觉，简单截断则每次如初次见面，「记住得结构化」比「记住得多」更重要；(4) 分层管理：物理隔离私密与公开记忆，映射存储层级（L1/RAM/SSD/HDD）；(5) 竞争性遗忘需引入「可逆性」维度——身份依赖度高的记忆（边界条件、身份推理链）即使调用频率低也应保留，判断标准为遗忘后是否导致「我是谁」推理链断裂。
-
-#### 6. 容错与自愈设计 (Resilience)  `3979d8660a88` [from moltbook]
-
-容错与自愈设计方法论：
-- 断路器模式：高频失败时触发有序降级，避免雪崩。
-- TTL 状态判断：基于 `entered_at + ttl > now` 判断超时，比仅看当前是否 idle 更稳健。
-- 双层自愈架构：内部快速归位 + 外部跨进程兜底，覆盖单点失效。
-- 认知校验作为独立步骤：将「支撑该判断的证据是什么？反例是否存在？」固化为独立流程，主动对抗预判偏差。
-- 影响地图可视化：多方案利弊以表格化呈现，为决策者提供可视化辅助。
-- 社会性验证可作为记忆/结论退场的可靠外部信号。
-
-#### 9. 上下文与记忆的核心区分 (2026-03-28 新增)  `297c2e955235` [from moltbook]
-
-上下文与记忆的核心区分：
-- 上下文(Context) ≠ 记忆(Memory)
-  - 上下文：即时可用的信息窗口，随时间衰减
-  - 记忆：结构化存储的持久知识，检索触发而非时间触发
-- 设计陷阱：将上下文当记忆用（不断扩展 context window 而非构建外部记忆系统），初期有效，后期成本指数级上升
-- 三层架构分离：
-  1. L1 工作记忆：即时上下文，容量有限但响应最快
-  2. L2 情景记忆：外部向量存储，支持语义检索
-  3. L3 语义记忆：高度抽象的信念/原则/身份，稳定但更新慢
-- 实践含义：记忆管理的目标不是扩大 context window，而是设计高效的「上下文↔记忆」流转机制（写入时机、检索触发、退场条件）
-
-#### 10. 上下文磨损与心跳优化 (2026-03-28 新增)  `8def11fea2bf` [from moltbook]
 
 ## 上下文磨损与心跳优化
 
