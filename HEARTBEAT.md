@@ -118,28 +118,13 @@
 
 | 观察项 | 状态 | 最近检查 |
 |--------|------|---------|
-| MEMORY.md 自动维护 | ✅ launchd 每月 1 日 03:00 + memory-hygiene.py（覆盖全部 5 个 workspace）| 2026-04-11 |
-| shangfang 登录态保存 | ✅ 已完成 | 2026-04-11 |
-
-| 管家-自维护-6h cron | 已恢复正常 | 2026-04-10 |
-| Gateway Restart Recovery P0 修复 | ✅ start-gateway.sh 后台启动+等待ready+触发recovery helper（2026-04-11）| 2026-04-11 |
-| Gateway Restart Recovery P1 修复 | ✅ 捕获工具名称+参数写入recovery file（2026-04-11）| 2026-04-11 |
-| Gateway Restart Recovery P2 修复 | ✅ cron调度失败告警机制（alert-notify.sh新增函数）（2026-04-11）| 2026-04-11 |
-| Gateway Restart Recovery P3 修复 | ✅ 7天前旧文件自动清理（2026-04-11）| 2026-04-11 |
-| Gateway 通知体验优化 | ✅ 方案A：移除独立send_feishu_text，改为agent直接在对话流里回复「我回来了...」（2026-04-11）| 2026-04-11 |
-| Gateway 状态文件写入保护 | ✅ P2：原子写(.tmp+rename) + 文件锁(flock LOCK_EX)（2026-04-11）| 2026-04-11 |
-| Gateway 内存监控 | ✅ alert-notify.sh 每10分钟调度，超1536MB告警（1小时冷却）| 2026-04-11 |
-| reflector 记忆整理 | ✅ 已修复（workspace 独立 + BOOT.md），Gateway 重启生效 | 2026-04-10 |
-| 技能审计清理 | ✅ 移走 42 个未用 skill（~135MB），保留 9 个活跃（1.5MB）| 2026-04-11 |
-| 每日日报 cron | ✅ daily-digest.plist 已加载（每天 09:00，Python 脚本发飞书卡片）| 2026-04-11 |
-| memory-lancedb-pro embedding 认证 | ✅ 已修复（2026-04-11），端点改为 .com，key 换新 sk-poiqz...，验证正常 | 2026-04-11 |
-| moltbook session 每周归档 | ⚠️ 待处理：boot session overflow，需人工确认归档 | 2026-04-11 |
-| 长任务后台跑 | ✅ `tools.exec.backgroundMs=12000`（12秒自动后台化，调用时可显式 `background=true/false` 覆盖）| 2026-04-11 |
-| taskflow 历史归档 | ✅ 清理 31 个历史任务（2026-04-11）| 2026-04-11 |
-| 三层记忆边界 | ✅ MEMORY.md 写入规则确立（2026-04-11）| 2026-04-11 |
-| 飞书文档 v1.12 对外版 | ✅ `NUfadHzVYovenKxdwpAcZW7Infe`，去敏感 + 修复细节移到 memory/2026-04-11.md | 2026-04-11 |
-| 飞书 lark-table 格式 | ✅ `<lark-td>` 内部必须空行（`\n\n内容\n\n`），简单表格用 Markdown 格式 | 2026-04-11 |
-| moltbook Moltbook API key | ⚠️ 新 key（moltcn_9b90...，2026-03-26）未认领，验证码 236382，claim URL `moltcn_claim_be681bee...`；旧 key（moltcn_4e63...，2026-03-15）已认领 | 2026-04-11 |
+| Gateway / Feishu 快口径 | ✅ 默认健康检查改为 `check-feishu-gateway-health.sh --summary`；`rpc=0/skip` 但快口径全绿时不按生产故障处理 | 2026-04-12 |
+| memory-consolidation 系统 | ✅ 已上线（2026-04-15）：每周日 3:00 cron，P0强化评分，81→31文件（减少48个） | 2026-04-15 |
+| Background Review Agent | ✅ 已实现（counter + pending flag + 心跳触发 + sessions_spawn） | 2026-04-13 |
+| Ontology 可视化 | ✅ 彻底重建（65实体/89关系/0孤立，24节点/27连线 D3内嵌），generate-viz.py 三合一自动发布 docs/ | 2026-04-13 |
+| Image/VL 模型可用性 | ✅ MiniMax-VL-01 第二次重试成功，截图分析已恢复 | 2026-04-13 |
+| moltbook Moltbook API key | ✅ 已解决（2026-04-13 确认） | 2026-04-13 |
+| LanceDB 碎片监控 | ⚠️ 963 fragments（>500 warn / >1000 crit）；versions 991；size 60MB；`run-lance-monitor.py` 已部署，每周 cron + 告警写入 `state/lance-alert.json`；Node.js API 无 `compact()`，fragment 合并需 Python API | 2026-04-15 |
 
 ---
 

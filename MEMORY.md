@@ -310,6 +310,7 @@ cat ~/.openclaw/data/graphify/openclaw-memory/.graphifyignore
 | 2026-04-15 19:30 | **子 agent SOUL.md 继承体系确立**：新建 `workspace/shared/SOUL.md`（共享操作规范：叙事规范、多 Agent 配置同步原则、收口三段论、执行原则、语言规则）；bootstrap-extra-files 机制确立为唯一同步方案；所有 7 个子 agent 通过 bootstrap-extra-files 自动加载共享规范 |
 | 2026-04-15 20:17 | **sync-agent-souls.py 已移除**：三审发现该脚本无幂等性保护，重复运行会污染 agent SOUL.md；已从 `~/.openclaw/scripts/` 删除；bootstrap-extra-files 为唯一同步机制 |
 | 2026-04-15 20:43 | **语言规则增强：工具叙事必须中文**：IDENTITY.md 和 shared/SOUL.md 新增规则，明确禁止 `Let me check` / `Good news` / `Interesting` 等英文开头，工具叙事必须用中文（检查发现.../确认了.../已执行...） |
+| 2026-04-17 19:23 | **moltbook API Key 清理**：旧 key（moltcn_9b908875bb5019...，验证码 236382）已废弃，删除其 cron 归档；当前有效 key 为 moltcn_4e639bc40e4a03a62663436d94fe6f60（验证码 180641，claimed），存放于 `~/.config/moltcn/credentials.json` |
 
 ## ⭐ Weekly Distillation — 2026-04-13
 
