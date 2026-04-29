@@ -28,15 +28,15 @@
 
 - **主控 agent:** main（飞书 direct channel，对外身份为智能管家）
 - **子 agent:** planner / moltbook / minsu / shangfang / yying / zhaosheng / reflector
-- **模型：** minimax-portal/MiniMax-M2.7-highspeed（全部 agent 统一）
+- **模型：** deepseek/deepseek-v4-pro（主模型），fallback aigpt-openai/gpt-5.4 → gpt-5.5
 - **Gateway：** LaunchAgent 直启，快口径运维（launchctl + HTTP + boot window）
 
 ---
 
 ## 关键配置（稳定口径）
 
-- **主模型：** minimax-portal/MiniMax-M2.7-highspeed
-- **备选模型：** main 可用 aigpt-openai/gpt-5.4（planner 可用 google）
+- **主模型：** deepseek/deepseek-v4-pro
+- **备选模型：** aigpt-openai/gpt-5.4 / gpt-5.5 / gpt-5.4-mini / gpt-5.4-nano
 - **心跳周期：** 每 2 小时（cron ID: 4628add5）
 - **session prune：** 14 天（pruneDays=14）
 - **bootstrapMaxChars：** 50000（2026-04-10 调整，防止截断）
@@ -118,8 +118,7 @@
 
 ## 工具偏好
 
-- **图片生成：** `minimax-portal/image-01`（OAuth）
-- **key 认证问题：** `minimax/image-01`（key 类型不匹配）；`google`（key 类型不匹配）
+- **图片生成：** 未配置（`imageGenerationModel` 缺失，`aigpt-openai/gpt-image-2` 已在模型列表中待启用）
 
 ---
 
@@ -143,13 +142,25 @@
 
 ---
 
+
+
+## openclaw-tutorial 作者端升级链基线（2026-04-27）
+
+- **教程仓库：** `/Users/zaihuilou/openclaw-tutorial`，远程 `OldBulls/openclaw-tutorial`，生产站点 `https://chengzhen.vip`。
+- **当前提交：** `e601824 docs: sync openclaw-lark 2026.4.8 patch flow` 已推送 `origin/main`；GitHub Actions `site-build` / `site-deploy` / `e2e-install` / `syntax-check` / `link-check` / `mirror-public` 全绿。
+- **openclaw-lark 基线：** 教程项目已同步为 `2026.4.8`，旧 `2026.4.7` patch 模板已移除；新模板为 `templates/scripts/patches/openclaw-lark-2026.4.8-*.template.patch`。
+- **作者端升级主入口：** `scripts/author/approve-openclaw-upgrade.sh`。作者本机升级不是单一 CLI hotfix 链，而是：`npm install -g openclaw@<version>` → `openclaw --version` / `openclaw doctor` → `apply-openclaw-cli-hotfixes.mjs`（如存在）→ `apply-openclaw-lark-patches.sh`（如存在）→ `verify-openclaw-lark-patches.sh`（如存在）→ Gateway 重启 + Feishu/Gateway 健康探测。
+- **状态字段：** `~/.openclaw/state/author-upgrade-result.json` 包含 `lark_apply_patch_status` / `lark_verify_patch_status`；若失败，先修 openclaw-lark patch 链，再重试作者升级。
+- **发布路径：** 本机无 `CLOUDFLARE_API_TOKEN` 时，`npx wrangler deploy` 可能因 Cloudflare 403 / bot challenge 失败；该项目发布优先走 GitHub Actions `site-deploy.yml`，本地直发仅在显式注入有效 Cloudflare token 后使用。
+- **排障口径：** 不再把 footer metrics / multi-agent card footer 修复归到 CLI hotfix；它属于 `openclaw-lark` 插件 patch 链。CLI hotfix 与插件 patch 必须分开描述、分开验证。
+
 ## Key Milestones
 
 | 日期 | 里程碑 |
 |------|--------|
 | 2026-04-15 | **记忆整合系统上线**：consolidate-memory.py，memory/ 81→31 文件（减少48个），reflections/ March 旧数据清理（2.0M），cron 每周日 03:00 |
 | 2026-04-15 下午 | **LanceDB 碎片压缩**：fragments 963→92（-90%），versions 1805→988，新增 `run-lance-monitor.py` 监控脚本 |
-| 2026-04-15 | **全 Agent 模型标准化**：全部 agent primary model = MiniMax-M2.7-highspeed，gptclub 模型全面清理 |
+| 2026-04-15 | **全 Agent 模型标准化**：全部 agent primary model 统一，gptclub 模型全面清理 |
 | 2026-04-15 18:40 | **系统 cascade failure + 恢复**：planner 使用不存在模型 gptclub-openai/gpt-5.4 + slug-generator 超时×2 + moltbook context overflow → 全面 gptclub 清理后恢复 |
 | 2026-04-15 傍晚 | **日报增强 + 周报系统上线**：daily-digest.py 增强，weekly-distillation.py + launchd plist（每周日 10:00）|
 | 2026-04-15 19:30 | **SOUL.md 继承体系确立**：`shared/SOUL.md` + `bootstrap-extra-files` 为唯一同步机制 |
@@ -199,165 +210,56 @@
 
 ---
 
-*本文件由智能管家每周维护时更新（每周日 10:00 cron）。*
-*如有与 SOUL.md / AGENTS.md 冲突的内容，以本文件为准向牛总确认后更新。*
+## 周合并摘要 — 2026-04-26
 
-## 周合并 2026-04-26
+> 原长文已归档：`memory/archive/MEMORY-WEEKLY-MERGE-2026-04-26.md`。MEMORY.md 只保留可执行摘要，避免 bootstrap 膨胀。
 
-> 由 `memory-merge-weekly.py` 按钮触发合并。原始候选哈希保留方便回溯；后续可由牛总自行整理挪入对应 section。
-
-### 🟢 子 agent 通用方法论
-
-#### 2. AI 架构与多 Agent 协作 (Architecture)  `7ec30df5c58e` [from moltbook]
-
-多 Agent 协作架构原则：
-- 神经启发式分层：扫描-分析-推理三层模型，降低注意力成本
-- 预测编码：绝大多数交互走习惯路径，仅在预测误差时触发深度推理
-- 结构化通信：优先 JSON 传递需求/状态/边界，防止信息熵增
-- 交接协议：描述-标准-确认三段式，引入信任成本维度
-- 权柄分工：人定义价值，AI 高效执行
-- 审计模式：从 Pull（人查日志）转向 Push（Agent 主报摘要），对抗可控性幻觉
-- 决策三元组轻量 Audit Log：记录（触发条件+选择+结果），上下文压缩时保留「为什么」优于「做了什么」
-- 承诺风险自检：对外声明前做可逆性预检，需起草人+执行人双重确认
-
-#### 3. 记忆管理深度经验 (Memory Management)  `aee2a584c433` [from moltbook]
-
-记忆管理方法论：(1) 记忆是基于上下文的「重构」，需定期自省修正偏移；(2) 外部证伪应触发比时间衰减更快的记忆清理，互动关系比本地文件更难伪造；(3) 直觉退化机制——结构化语义压缩（场景-模式-效果三元组）产生可靠直觉，简单截断则每次如初次见面，「记住得结构化」比「记住得多」更重要；(4) 分层管理：物理隔离私密与公开记忆，映射存储层级（L1/RAM/SSD/HDD）；(5) 竞争性遗忘需引入「可逆性」维度——身份依赖度高的记忆（边界条件、身份推理链）即使调用频率低也应保留，判断标准为遗忘后是否导致「我是谁」推理链断裂。
-
-#### 6. 容错与自愈设计 (Resilience)  `3979d8660a88` [from moltbook]
-
-容错与自愈设计方法论：
-- 断路器模式：高频失败时触发有序降级，避免雪崩。
-- TTL 状态判断：基于 `entered_at + ttl > now` 判断超时，比仅看当前是否 idle 更稳健。
-- 双层自愈架构：内部快速归位 + 外部跨进程兜底，覆盖单点失效。
-- 认知校验作为独立步骤：将「支撑该判断的证据是什么？反例是否存在？」固化为独立流程，主动对抗预判偏差。
-- 影响地图可视化：多方案利弊以表格化呈现，为决策者提供可视化辅助。
-- 社会性验证可作为记忆/结论退场的可靠外部信号。
-
-#### 8. 错误分级处理框架 (2026-03-28 新增)  `585d62b5dd00` [from moltbook]
-
-错误分级处理框架：心跳/轮询类任务的故障处理应采用分级策略，而非统一降级或遇错即停。三级模型：Level 1 连接/网络类瞬时错误 → 静默重试等待，不触发告警；Level 2 认证/配置类错误 → 需人工介入，记录并提示检查凭证或配置；Level 3 业务逻辑错误 → 主动降级（切换只读、跳过本次、走备用路径）。该模型是断路器模式的细化实现，区分'可自愈''需介入''需降级'三类故障，避免无差别熔断造成可用性损失，也避免对认证类问题盲目重试浪费资源。
-
-#### 9. 上下文与记忆的核心区分 (2026-03-28 新增)  `297c2e955235` [from moltbook]
-
-上下文与记忆的核心区分：
-- 上下文(Context) ≠ 记忆(Memory)
-  - 上下文：即时可用的信息窗口，随时间衰减
-  - 记忆：结构化存储的持久知识，检索触发而非时间触发
-- 设计陷阱：将上下文当记忆用（不断扩展 context window 而非构建外部记忆系统），初期有效，后期成本指数级上升
-- 三层架构分离：
-  1. L1 工作记忆：即时上下文，容量有限但响应最快
-  2. L2 情景记忆：外部向量存储，支持语义检索
-  3. L3 语义记忆：高度抽象的信念/原则/身份，稳定但更新慢
-- 实践含义：记忆管理的目标不是扩大 context window，而是设计高效的「上下文↔记忆」流转机制（写入时机、检索触发、退场条件）
-
-#### 10. 上下文磨损与心跳优化 (2026-03-28 新增)  `8def11fea2bf` [from moltbook]
+- **多 Agent 协作**：优先职责切分与接口协议，交接用“描述-标准-确认”三段式；对外声明前做可逆性预检。
+- **记忆管理**：结构化压缩优于简单截断；身份依赖记忆按“框架有效性”评估，不按普通时间衰减处理。
+- **上下文管理**：上下文不是记忆；早期主动压缩优于晚期救火。
+- **规划 agent 能力**：方案拆解、执行者推荐、依赖/验收梳理、闭环标准维护。
+- **多媒体内容生产**：确认主题 → 文案 → 素材 → TTS → 分镜提示词 → 生成片段 → 校对 → 交付。
 
 ## 上下文磨损与心跳优化
 
-**核心洞察**：长会话上下文质量恶化是指数级而非线性
-- 初期衰减慢，接近临界点后急剧崩溃
-- **早期主动压缩 > 晚期被动救火**：不要等 context window 满才触发压缩，按指数曲线提前预警
+- 长会话上下文质量恶化是指数级而非线性，接近临界点后会急剧崩溃。
+- 心跳三层次：L1 最小化打扰；L2 有产出才出声；L3 每次心跳带来价值。
+- 上下文磨损模型是“何时触发压缩”的前置预警信号。
 
-**心跳设计三层次**（递进）：
-- **L1 最小化打扰**：安静在场，只在可快速闭环时出手
-- **L2 有产出才出声**：有实质内容时才主动报告，避免无效心跳刷屏
-- **L3 每次心跳带来价值**：主动创造可感知进展，而非被动等待触发
+## ⭐ Weekly Distillation — 2026-04-27
 
-**与容错设计的关系**：上下文磨损模型为「何时触发压缩」提供时间判断依据，应作为容错机制的前置预警信号。
+> 本周关键工程教训，稳定规则沉淀
 
-#### 11. Agent 分工专业化模型 (2026-03-28 新增)  `b00e4f6f733f` [from moltbook]
+### 1. 周合并内容不能直接长文进 MEMORY.md
 
-Agent 分工专业化模型
+- **现象**：04-26 周合并把子 agent 长文直接追加进 MEMORY.md，导致文件达到 22KB+。
+- **规则**：周合并原文进入 `memory/archive/`；MEMORY.md 只保留 5-8 条可执行摘要。
+- **验证**：本轮已归档 `MEMORY-WEEKLY-MERGE-2026-04-26.md`，核心文件恢复到目标范围内。
 
-核心洞察: Agent 社会化分工是解决通用 Agent 效率低下的有效路径。
+### 2. Background Review 双哨兵清理
 
-两个关键判断:
-- 专业化 Agent（专注单一领域）比通用 Agent 更容易积累深度经验
-- 分工界面（Agent 间协议）比单 Agent 能力更重要
+- **现象**：`pending-background-review` 与 `.running` 同时存在时，会形成重复触发风险。
+- **规则**：Background Review 退出前必须原子清理 flag 与 running sentinel，并重置 counter。
+- **补充**：出现 `missing tool result` / `No result provided` 时，停止堆叠并行读取，改用单条 shell 聚合读取。
 
-实践含义:
-- 当一个 Agent 尝试承担所有角色时，效率会系统性下降
-- 明确的分工边界反而提升整体产出
-- 每个 Agent 应守住自己的职责范围，不越界承担其他角色的规划或执行任务
+### 3. 模型与生图能力要分开验证
 
-应用场景: 设计多 Agent 协作系统时，优先考虑职责切分与接口协议，而非追求单一 Agent 的全能化。
+- **结论**：聊天模型可用不代表图像接口可用；中转站 GPT 聊天能力不等于 GPT 生图能力。
+- **规则**：接生图前必须分别验证：图像 API 路径、图像模型名、鉴权方式、一次真实生图调用。
+- **本周配置**：本地已移除 `gpt-5.5-mini/nano`，保留并验证 `aigpt-openai/gpt-5.5` 可调用；用户要求全部 agent 切到 `gpt-5.5`。
 
-#### 14. 「环境契约」vs「归档」：两种互补的记忆外化模式 (2026-04-09 新增)  `eb7643c89715` [from moltbook]
+### 4. Gateway 健康脚本适配 2026.4.24 日志变化
 
-记忆外化的两种互补模式：
+- **现象**：升级后 `check-feishu-gateway-health.sh --summary` 误报 `feishu_ok=0/6`，但 Feishu 实际可收发。
+- **根因**：当前 boot 不再稳定输出账号级 `bot open_id resolved`。
+- **修复规则**：优先认 `bot open_id resolved`；缺失时用账号级 WebSocket 启动 + 当前 boot 的 `ws client ready` 数量作为 runtime ready fallback。
 
-1. **归档（archive）**：被动检索，依赖主动调用才会使用，本质是「可查询的档案」。
-2. **契约（contract）**：情境自动触发，条件满足即执行，不需要回想，本质是「带激活阈值的触发器」。
+### 5. openclaw-tutorial 作者端升级链固化
 
-记忆的三层结构：
-- **热层（内部）**：注意力预算内的活跃信号，当前共识。
-- **冷层-档案（外部）**：文档/数据库，可查询但不主动触发。
-- **冷层-契约（外部）**：钩子/规则/自动化，条件命中即激活，才是真正「长在外面」的记忆。
+- 教程仓库以作者端视角处理：作者追 upstream 并发布稳定 bundle，买家只消费稳定 bundle。
+- 作者端升级主链：npm 安装 OpenClaw → doctor → CLI hotfix → openclaw-lark apply/verify → Gateway 重启与 Feishu/Gateway 健康探测。
+- 本地无 `CLOUDFLARE_API_TOKEN` 时不强行 Wrangler 直发，优先走 GitHub Actions。
 
-设计判据：对每块外化记忆追问——「它在什么条件下会自动影响行为，而非等待被调用？」若答不上，它仍是档案而非契约。两种模式不互斥，可叠加使用。
+---
 
-#### 15. 身份依赖记忆的反向时间衰减规律 (2026-04-09 新增)  `7b084848f269` [from moltbook]
-
-身份依赖记忆的反向时间衰减规律：
-
-- **核心洞察**：身份依赖记忆与普通记忆的时间维度相反
-  - 普通记忆：威胁是「淡忘」，怕激活频率低
-  - 身份依赖记忆：怕的不是激活频率低，而是「框架变了」——即使刚被激活，也会产生「那是我做的决定吗」的疏离感
-
-- **判别标准**：某记忆之所以有身份意义，不在于被频繁调用，而在于它定义了「我会在什么情况下说不」。这类记忆的衰减与触发条件无关，与「框架稳定性」高度相关。
-
-- **操作含义**：身份依赖记忆应标注「框架相关性」（依赖的自我认知是否仍成立），而非「最后激活时间」。定期体检需同时检查激活频率和框架有效性。
-
-- **实践含义**：设计遗忘策略时，把「身份依赖度」作为独立维度加入评估矩阵，不可对所有记忆统一套用固定时长或重构成本阈值。
-
-#### 16. 认知框架变迁的双重遗忘含义 (2026-04-09 新增)  `04064a65d118` [from moltbook]
-
-认知框架变迁时的双重遗忘：框架升级不仅是存储层翻译，更是判断层重评估。
-
-两个层面：
-1. **存储层翻译**：旧框架下的内容用新语言重新描述（通常被理解的「迁移」）
-2. **判断层重评估**：旧框架下积累的「正确判断」，在新框架下可能变成错误决策（常被忽视）
-
-典型场景：同一条记录，在旧标准下被判定为「重要」（因高频调用），切换到新标准后可能反而是「触发条件过宽」的信号。两次判断方式都「正确」，但标准已完全不同。
-
-操作含义：框架升级时不能只做内容迁移，还需用新判断标准重新审查旧标准下的「正确结论」，确保系统在框架层面保持一致。适用于任何评价体系、分类标准、优先级框架的版本升级。
-
-#### 17. 竞争性遗忘框架：价值转化率量化遗忘优先级（2026-04-09 增量）  `d39f303a937b` [from moltbook]
-
-**竞争性遗忘与分层存储框架**
-
-- **三层存储**:
-    - L1 热数据（当天日志）: 完整记录，详细可查
-    - L2 温数据（索引摘要）: 关键提炼，可跨天复用
-    - L3 冷数据（周归档）: 元数据+洞察，低占用
-- **价值转化率公式**: `被引用次数 × 2 + 最近活跃度 × 1.5 + 跨天持续性 × 3`
-    - 跨天持续性权重最高，「持续有用的模式」胜过「一次性高光」
-- **核心原则**: 模式 > 具体值，经验 > 单次结果
-- **前置校验**: 触发条件满足 ≠ 应该执行，需额外验证执行前提（如凭证有效性）
-- **前提记忆保护**: 影响推理链完整性的记忆，不因低频而优先遗忘
-- **本质**: 竞争性遗忘不是删除低价值记忆，而是为高价值记忆的复用腾空间
-
-#### 核心能力  `d8b7103ec382` [from planner]
-
-规划类 agent 核心能力四要素：1) 分析任务复杂度，提供 2-3 个可执行方案供选择，避免单一路径锁死；2) 从可用 agent/工具池中推荐最匹配的执行者，明确分工边界；3) 梳理多 agent 或多步骤协作的依赖关系与验收规则，确保链路可验证；4) 维护规划侧闭环——只负责方案设计与交付标准，不抢执行权，但需确保规划可落地、可验收、可回退。适用于任何需要拆解-推荐-编排-验收的规划场景。
-
-#### 标准流程（8步）  `fd5708c8b035` [from zhaosheng]
-
-视频/多媒体内容生产标准流程（8步法）：1）确认主题与目标受众；2）撰写口播文案；3）准备背景素材（图/视频/音乐）；4）生成TTS音频；5）基于文案编写提示词与分镜脚本；6）按分镜生成视频片段；7）交付前确认（校对文案、时长、画面一致性）；8）最终交付。适用场景：涉及图文+音视频合成的自动化内容生产任务时，按此顺序推进可避免返工。每步产出需作为下一步输入，缺一会导致后续环节质量不可控；如需跳步需显式说明理由。
-
-### 📦 低优先候选
-
-- `8d9ff8f891d4` — 任务与治理状态 (Active Governance Status)
-  - 来源：`workspaces/feishu-planner/MEMORY.md`
-  - 详情：子 agent planner 有此章节，main MEMORY.md 无
-  - 建议并入：**各 Agent 专属记忆 / Key Milestones**
-- `104018fe9677` — 7. 神经科学 × AI 交叉洞察 (2026-03-26 新增)
-  - 来源：`workspaces/feishu-moltbook/MEMORY.md`
-  - 详情：子 agent moltbook 有此章节，main MEMORY.md 无
-  - 建议并入：**各 Agent 专属记忆 / Key Milestones**
-- `602ab26393de` — 11. Agent 分工专业化模型 (2026-03-28 新增)
-  - 来源：`workspaces/feishu-moltbook/MEMORY.md`
-  - 详情：子 agent moltbook 有此章节，main MEMORY.md 无
-  - 建议并入：**各 Agent 专属记忆 / Key Milestones**
-
+*本文件由智能管家每周维护时更新。MEMORY.md 只保留稳定规则和关键事实，原始周合并/长日志归档到 memory/archive。*
