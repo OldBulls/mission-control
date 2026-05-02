@@ -154,6 +154,14 @@
 - **发布路径：** 本机无 `CLOUDFLARE_API_TOKEN` 时，`npx wrangler deploy` 可能因 Cloudflare 403 / bot challenge 失败；该项目发布优先走 GitHub Actions `site-deploy.yml`，本地直发仅在显式注入有效 Cloudflare token 后使用。
 - **排障口径：** 不再把 footer metrics / multi-agent card footer 修复归到 CLI hotfix；它属于 `openclaw-lark` 插件 patch 链。CLI hotfix 与插件 patch 必须分开描述、分开验证。
 
+## openclaw-tutorial 版本/文档同步复查规则（2026-05-02）
+
+- **触发条件：** 任何安装包发版、OpenClaw 基线调整、买家安装/更新链修复、gateway/runtime 自愈改动、memory-lancedb-pro 补丁改动、公开 docs 更新。
+- **必须复查：** `meta/PRODUCTION_BASELINE.md`、`site/wrangler.toml`、`site/.env.example`、`docs/_REWRITE_STATUS.md`、`site/astro.config.mjs` 侧边栏、`docs/00-先读我.md` 版本说明、`docs/07-实战/00-最近新增能力总览.md`、`docs/FAQ.md`。
+- **版本事实：** R2 `latest.json`、`latest.json.sig`、zip、manifest、zip.sig、manifest.sig、公钥、`LATEST_BUNDLE_HISTORY_JSON` 必须与当前稳定包一致；本地 `.release-artifacts` 缺某版 `latest.json` 时要补齐，否则版本历史会漏项。
+- **已踩坑：** v1.0.10 后发现站点 fallback 和生产基线仍停在 v1.0.9，侧边栏漏挂已有章节，`docs/_REWRITE_STATUS.md` 章节数误写 43，memory-lancedb-pro 要同时校验源码和 `openclaw.plugin.json` 的 `autoRecallTimeoutMs=15000`。
+- **最小验证：** `cd site && npm run build`、`bash tests/e2e-site-auth-registry-smoke.sh`、`git diff --check`、docs 脱敏扫描；改买家安装/模板时再加 `tests/e2e-install.sh`、`tests/e2e-update.sh`、`tests/e2e-gateway-service-repair.sh`。
+
 ## Key Milestones
 
 | 日期 | 里程碑 |
